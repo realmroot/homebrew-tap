@@ -1,30 +1,18 @@
 class Realmroot < Formula
   desc "Agent-native CLI for Realmroot resources and authorization"
   homepage "https://github.com/realmroot/cli"
+  url "https://github.com/realmroot/cli/archive/refs/tags/v0.4.0.tar.gz"
+  sha256 "b2daaeb995b81fd658db1eb78f498503e19a4b0e24f9b8351422c53a07772c3c"
   license "Apache-2.0"
 
-  on_macos do
-    if Hardware::CPU.arm?
-      url "https://github.com/realmroot/cli/releases/download/v0.4.0/realmroot_0.4.0_darwin_arm64.tar.gz"
-      sha256 "a7a20c613a40a6126661e02810895d0f550d366c30aa197bf0fa08ec3491136a"
-    else
-      url "https://github.com/realmroot/cli/releases/download/v0.4.0/realmroot_0.4.0_darwin_amd64.tar.gz"
-      sha256 "8314849ad9735546a2922a21af663c14a64765c1ee48842c33a3530436fe2e9f"
-    end
-  end
-
-  on_linux do
-    if Hardware::CPU.arm?
-      url "https://github.com/realmroot/cli/releases/download/v0.4.0/realmroot_0.4.0_linux_arm64.tar.gz"
-      sha256 "9d9ebb9fa0ed4aa51ae207ca70da613a14a6a67ecd1704df9687ecf82db441bf"
-    else
-      url "https://github.com/realmroot/cli/releases/download/v0.4.0/realmroot_0.4.0_linux_amd64.tar.gz"
-      sha256 "ec8b3c6f460aed9bc69eea7702363255139c169fb297240a9dda5977e1f86018"
-    end
-  end
+  depends_on "go" => :build
 
   def install
-    bin.install "realmroot"
+    ldflags = %W[
+      -s -w
+      -X github.com/realmroot/toolbox/internal/buildinfo.Version=v#{version}
+    ]
+    system "go", "build", *std_go_args(ldflags:)
   end
 
   test do
