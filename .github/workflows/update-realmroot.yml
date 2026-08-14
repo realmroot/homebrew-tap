@@ -1,0 +1,43 @@
+name: Update Realmroot Cask
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 5 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Update to the latest Realmroot CLI release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="$(gh release view --repo realmroot/cli --json tagName --jq .tagName)"
+          version="${tag#v}"
+          curl --fail --location --silent --show-error \
+            --output checksums.txt \
+            "https://github.com/realmroot/cli/releases/download/${tag}/checksums.txt"
+          arm64="$(awk -v name="realmroot_${version}_darwin_arm64.tar.gz" '$2 == name { print $1 }' checksums.txt)"
+          amd64="$(awk -v name="realmroot_${version}_darwin_amd64.tar.gz" '$2 == name { print $1 }' checksums.txt)"
+          test -n "$arm64"
+          test -n "$amd64"
+          VERSION="$version" ARM64="$arm64" AMD64="$amd64" ruby <<'RUBY'
+          path = "Casks/realmroot.rb"
+          content = File.read(path)
+          content.sub!(/version "[^"]+"/, "version \"#{ENV.fetch("VERSION")}\"")
+          content.sub!(/sha256 arm: "[a-f0-9]+", intel: "[a-f0-9]+"/, "sha256 arm: \"#{ENV.fetch("ARM64")}\", intel: \"#{ENV.fetch("AMD64")}\"")
+          File.write(path, content)
+          RUBY
+          rm checksums.txt
+          git diff --quiet && exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/realmroot.rb
+          git commit -m "chore(cask): update realmroot to ${version}"
+          git push
