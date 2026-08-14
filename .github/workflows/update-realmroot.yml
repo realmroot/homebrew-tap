@@ -21,19 +21,38 @@ jobs:
           tag="$(gh release view --repo realmroot/cli --json tagName --jq .tagName)"
           version="${tag#v}"
           curl --fail --location --silent --show-error \
-            --output source.tar.gz \
-            "https://github.com/realmroot/cli/archive/refs/tags/${tag}.tar.gz"
-          source_sha="$(sha256sum source.tar.gz | awk '{ print $1 }')"
-          test -n "$source_sha"
-          VERSION="$version" SOURCE_SHA="$source_sha" ruby <<'RUBY'
+            --output checksums.txt \
+            "https://github.com/realmroot/cli/releases/download/${tag}/checksums.txt"
+          darwin_arm64="$(awk -v name="realmroot_${version}_darwin_arm64.tar.gz" '$2 == name { print $1 }' checksums.txt)"
+          darwin_amd64="$(awk -v name="realmroot_${version}_darwin_amd64.tar.gz" '$2 == name { print $1 }' checksums.txt)"
+          linux_arm64="$(awk -v name="realmroot_${version}_linux_arm64.tar.gz" '$2 == name { print $1 }' checksums.txt)"
+          linux_amd64="$(awk -v name="realmroot_${version}_linux_amd64.tar.gz" '$2 == name { print $1 }' checksums.txt)"
+          test -n "$darwin_arm64"
+          test -n "$darwin_amd64"
+          test -n "$linux_arm64"
+          test -n "$linux_amd64"
+          VERSION="$version" \
+            DARWIN_ARM64="$darwin_arm64" DARWIN_AMD64="$darwin_amd64" \
+            LINUX_ARM64="$linux_arm64" LINUX_AMD64="$linux_amd64" ruby <<'RUBY'
           path = "Formula/realmroot.rb"
           content = File.read(path)
           version = ENV.fetch("VERSION")
-          raise "missing Formula release URL" unless content.sub!(%r{archive/refs/tags/v[^/]+\.tar\.gz}, "archive/refs/tags/v#{version}.tar.gz")
-          raise "missing Formula checksum" unless content.sub!(/sha256 "[a-f0-9]+"/, "sha256 \"#{ENV.fetch("SOURCE_SHA")}\"")
+          replaced = content.gsub!(%r{releases/download/v[^/]+/realmroot_[^_]+_}) do
+            "releases/download/v#{version}/realmroot_#{version}_"
+          end
+          raise "missing Formula release URLs" unless replaced
+          {
+            "darwin_arm64" => ENV.fetch("DARWIN_ARM64"),
+            "darwin_amd64" => ENV.fetch("DARWIN_AMD64"),
+            "linux_arm64" => ENV.fetch("LINUX_ARM64"),
+            "linux_amd64" => ENV.fetch("LINUX_AMD64"),
+          }.each do |archive, checksum|
+            pattern = /(url "[^"]+_#{archive}\.tar\.gz"\n\s+sha256 ")[a-f0-9]+"/
+            raise "missing #{archive} Formula entry" unless content.sub!(pattern, "\\1#{checksum}\"")
+          end
           File.write(path, content)
           RUBY
-          rm source.tar.gz
+          rm checksums.txt
           git diff --quiet && exit 0
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
