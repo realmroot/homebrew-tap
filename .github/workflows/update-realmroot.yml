@@ -36,7 +36,11 @@ jobs:
             LINUX_ARM64="$linux_arm64" LINUX_AMD64="$linux_amd64" ruby <<'RUBY'
           path = "Formula/realmroot.rb"
           content = File.read(path)
-          content.sub!(/version "[^"]+"/, "version \"#{ENV.fetch("VERSION")}\"")
+          version = ENV.fetch("VERSION")
+          replaced = content.gsub!(%r{releases/download/v[^/]+/realmroot_[^_]+_}) do
+            "releases/download/v#{version}/realmroot_#{version}_"
+          end
+          raise "missing Formula release URLs" unless replaced
           {
             "darwin_arm64" => ENV.fetch("DARWIN_ARM64"),
             "darwin_amd64" => ENV.fetch("DARWIN_AMD64"),
