@@ -102,9 +102,9 @@ jobs:
             echo "Refusing changed checksums for existing enbor-runner ${version}." >&2
             exit 1
           fi
-          git diff --quiet && exit 0
+          git add Formula/enbor-runner.rb
+          git diff --cached --quiet && exit 0
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Formula/enbor-runner.rb
           git commit -m "chore(formula): update enbor-runner to ${version}"
           git push
