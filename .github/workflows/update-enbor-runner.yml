@@ -87,7 +87,7 @@ jobs:
               end
 
               test do
-                assert_match version.to_s, shell_output("#{bin}/enbor-runner version")
+                assert_match version.to_s, shell_output("\#{bin}/enbor-runner version")
               end
             end
           FORMULA
