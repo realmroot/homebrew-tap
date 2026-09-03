@@ -1,0 +1,110 @@
+name: Update Enbor Runner Formula
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "29 5 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Update to the latest Enbor Runner release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="$({
+            gh release list \
+              --repo realmroot/agency \
+              --limit 1000 \
+              --json tagName,isDraft,isPrerelease,publishedAt \
+              --jq '[.[] | select((.tagName | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$")) and (.isDraft | not) and (.isPrerelease | not)) | {tagName, parts: (.tagName[1:] | split(".") | map(tonumber))}] | sort_by(.parts) | last | .tagName // empty'
+          })"
+          if [[ -z "$tag" || "$tag" == "null" ]]; then
+            echo "No stable Enbor release found; leaving the Formula unchanged."
+            exit 0
+          fi
+          version="${tag#v}"
+          current_version="$(sed -n 's/^[[:space:]]*version "\([^"]*\)"/\1/p' Formula/enbor-runner.rb 2>/dev/null || true)"
+          if [[ -n "$current_version" ]] && dpkg --compare-versions "$version" lt "$current_version"; then
+            echo "Refusing to downgrade enbor-runner from ${current_version} to ${version}."
+            exit 0
+          fi
+          curl --fail --location --silent --show-error \
+            --output checksums.txt \
+            "https://github.com/realmroot/agency/releases/download/${tag}/checksums.txt"
+          darwin_arm64="$(awk -v name="enbor-runner_${version}_darwin_arm64.tar.gz" '$2 == name { print $1 }' checksums.txt)"
+          darwin_amd64="$(awk -v name="enbor-runner_${version}_darwin_amd64.tar.gz" '$2 == name { print $1 }' checksums.txt)"
+          linux_arm64="$(awk -v name="enbor-runner_${version}_linux_arm64.tar.gz" '$2 == name { print $1 }' checksums.txt)"
+          linux_amd64="$(awk -v name="enbor-runner_${version}_linux_amd64.tar.gz" '$2 == name { print $1 }' checksums.txt)"
+          test -n "$darwin_arm64"
+          test -n "$darwin_amd64"
+          test -n "$linux_arm64"
+          test -n "$linux_amd64"
+          for checksum in "$darwin_arm64" "$darwin_amd64" "$linux_arm64" "$linux_amd64"; do
+            [[ "$checksum" =~ ^[0-9a-f]{64}$ ]] || {
+              echo "Release checksum is not one exact lowercase SHA-256 value." >&2
+              exit 1
+            }
+          done
+          VERSION="$version" \
+            DARWIN_ARM64="$darwin_arm64" DARWIN_AMD64="$darwin_amd64" \
+            LINUX_ARM64="$linux_arm64" LINUX_AMD64="$linux_amd64" ruby <<'RUBY'
+          path = "Formula/enbor-runner.rb"
+          version = ENV.fetch("VERSION")
+          content = <<~FORMULA
+            class EnborRunner < Formula
+              desc "Self-hosted runtime runner for Enbor"
+              homepage "https://github.com/realmroot/agency"
+              license "Apache-2.0"
+              version "#{version}"
+              on_macos do
+                if Hardware::CPU.arm?
+                  url "https://github.com/realmroot/agency/releases/download/v#{version}/enbor-runner_#{version}_darwin_arm64.tar.gz"
+                  sha256 "#{ENV.fetch("DARWIN_ARM64")}"
+                else
+                  url "https://github.com/realmroot/agency/releases/download/v#{version}/enbor-runner_#{version}_darwin_amd64.tar.gz"
+                  sha256 "#{ENV.fetch("DARWIN_AMD64")}"
+                end
+              end
+              on_linux do
+                if Hardware::CPU.arm?
+                  url "https://github.com/realmroot/agency/releases/download/v#{version}/enbor-runner_#{version}_linux_arm64.tar.gz"
+                  sha256 "#{ENV.fetch("LINUX_ARM64")}"
+                else
+                  url "https://github.com/realmroot/agency/releases/download/v#{version}/enbor-runner_#{version}_linux_amd64.tar.gz"
+                  sha256 "#{ENV.fetch("LINUX_AMD64")}"
+                end
+              end
+
+              def install
+                bin.install "enbor-runner"
+              end
+
+              test do
+                assert_match version.to_s, shell_output("#{bin}/enbor-runner version")
+              end
+            end
+          FORMULA
+          File.write(path, content)
+          RUBY
+          rm checksums.txt
+          ruby -c Formula/enbor-runner.rb
+          if [[ "$current_version" == "$version" ]]; then
+            if git diff --quiet -- Formula/enbor-runner.rb; then
+              exit 0
+            fi
+            echo "Refusing changed checksums for existing enbor-runner ${version}." >&2
+            exit 1
+          fi
+          git diff --quiet && exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/enbor-runner.rb
+          git commit -m "chore(formula): update enbor-runner to ${version}"
+          git push
