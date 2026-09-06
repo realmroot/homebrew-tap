@@ -5,21 +5,21 @@ class Realmroot < Formula
 
   on_macos do
     if Hardware::CPU.arm?
-      url "https://github.com/realmroot/cli/releases/download/v0.5.1/realmroot_0.5.1_darwin_arm64.tar.gz"
-      sha256 "a9d480b18da2b1083226c440990d72c4e45fa9d44353a5231a4ee9fb6e399871"
+      url "https://github.com/realmroot/cli/releases/download/v0.5.3/realmroot_0.5.3_darwin_arm64.tar.gz"
+      sha256 "0636c3a2c56f2d151408325b94dcb23dfdcbde0b63e21b4df6733e6c157f6341"
     else
-      url "https://github.com/realmroot/cli/releases/download/v0.5.1/realmroot_0.5.1_darwin_amd64.tar.gz"
-      sha256 "fcf4c3c5425aa31e1f0463f4283c2121d4bf549674b7da152998a6bbc5414818"
+      url "https://github.com/realmroot/cli/releases/download/v0.5.3/realmroot_0.5.3_darwin_amd64.tar.gz"
+      sha256 "41784bc8b39bf9ab9a06a476c98b6da3de44115df57b976542bf3ce46e5d2f7d"
     end
   end
 
   on_linux do
     if Hardware::CPU.arm?
-      url "https://github.com/realmroot/cli/releases/download/v0.5.1/realmroot_0.5.1_linux_arm64.tar.gz"
-      sha256 "30fb872456a66a97da84bc2f3c3e508dce6725eb6df5bbd6fcdc1cff9d58e679"
+      url "https://github.com/realmroot/cli/releases/download/v0.5.3/realmroot_0.5.3_linux_arm64.tar.gz"
+      sha256 "379976b5a4b6fd4190f88363e359802fbc0c1a3a2d2288290c388566dbe725e9"
     else
-      url "https://github.com/realmroot/cli/releases/download/v0.5.1/realmroot_0.5.1_linux_amd64.tar.gz"
-      sha256 "e2091f4aa7ab20aa29c757b79775cce3d28434a60455effba7c6c8026f4a8399"
+      url "https://github.com/realmroot/cli/releases/download/v0.5.3/realmroot_0.5.3_linux_amd64.tar.gz"
+      sha256 "f2e0cc427cfad808deca9bb31e14e6b94d479d8d48fff279fe2c35807461feb8"
     end
   end
 
